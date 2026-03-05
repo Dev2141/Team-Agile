@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ThreatSense · Ollama VLM Analyser</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Syne:wght@400;700;800&family=Inter:wght@400;600;700&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --bg: #060810;
+      --surface: #0d1320;
+      --surface2: #111a2a;
+      --border: #1a2538;
+      --accent: #6366f1;
+      --accent2: #818cf8;
+      --threat: #f43f5e;
+      --threat-bg: #160810;
+      --ok: #10b981;
+      --ok-bg: #041610;
+      --warn: #f59e0b;
+      --text: #e2e8f0;
+      --muted: #64748b;
+      --dim: #94a3b8;
+      --r: 10px;
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    code,
+    pre,
+    .mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* ── Header ── */
+    .header {
+      padding: 18px 32px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: var(--surface);
+    }
+
+    .logo {
+      width: 38px;
+      height: 38px;
+      background: linear-gradient(135deg, var(--accent), #c026d3);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .header-title {
+      font-family: 'Syne', sans-serif;
+      font-size: 17px;
+      font-weight: 800;
+      letter-spacing: -.3px;
+    }
+
+    .header-subtitle {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 1px;
+    }
+
+    .model-tag {
+      margin-left: auto;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 4px 14px;
+      font-size: 11px;
+      color: var(--dim);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .health-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--muted);
+      margin-left: 6px;
+      display: inline-block;
+      vertical-align: middle;
+      transition: background .3s;
+    }
+
+    .health-dot.ok {
+      background: var(--ok);
+      box-shadow: 0 0 8px var(--ok);
+    }
+
+    .health-dot.err {
+      background: var(--threat);
+      box-shadow: 0 0 8px var(--threat);
+    }
+
+    /* ── Health bar ── */
+    .health-bar {
+      padding: 9px 32px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* ── Layout ── */
+    .main {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      padding: 24px 32px;
+      flex: 1;
+    }
+
+    @media (max-width: 900px) {
+      .main {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* ── Panels ── */
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--r);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel-header {
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .8px;
+      text-transform: uppercase;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: 'Syne', sans-serif;
+    }
+
+    .panel-body {
+      padding: 20px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Drop zone ── */
+    .drop-zone {
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      padding: 28px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+    }
+
+    .drop-zone:hover,
+    .drop-zone.over {
+      border-color: var(--accent);
+      background: rgba(99, 102, 241, .05);
+    }
+
+    .drop-icon {
+      font-size: 34px;
+      margin-bottom: 8px;
+    }
+
+    .drop-label {
+      font-weight: 700;
+      margin-bottom: 4px;
+      font-size: 14px;
+    }
+
+    .drop-sub {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .file-list {
+      margin-top: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .file-chip {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .file-chip img {
+      height: 32px;
+      width: 48px;
+      object-fit: cover;
+      border-radius: 3px;
+    }
+
+    .remove {
+      cursor: pointer;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1;
+    }
+
+    .remove:hover {
+      color: var(--threat);
+    }
+
+    /* ── Form ── */
+    .field {
+      margin-bottom: 12px;
+    }
+
+    .field label {
+      display: block;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .8px;
+      color: var(--muted);
+      margin-bottom: 5px;
+    }
+
+    .field input[type=text],
+    .field input[type=number] {
+      width: 100%;
+      padding: 8px 12px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 13px;
+      font-family: inherit;
+    }
+
+    .field input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 9px 22px;
+      border: none;
+      border-radius: 7px;
+      cursor: pointer;
+      font-family: 'Syne', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      transition: opacity .15s, transform .1s;
+    }
+
+    .btn:disabled {
+      opacity: .4;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), #8b5cf6);
+      color: #fff;
+    }
+
+    .btn-primary:not(:disabled):hover {
+      opacity: .88;
+      transform: translateY(-1px);
+    }
+
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--dim);
+    }
+
+    .btn-outline:hover {
+      border-color: var(--accent);
+      color: var(--text);
+    }
+
+    /* ── Spinner ── */
+    .spinner {
+      width: 15px;
+      height: 15px;
+      border: 2px solid rgba(255, 255, 255, .2);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    /* ── Progress ── */
+    .progress-wrap {
+      margin-top: 14px;
+      display: none;
+    }
+
+    .progress-bar {
+      height: 3px;
+      background: var(--surface2);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      width: 0%;
+      transition: width .4s;
+    }
+
+    .progress-label {
+      font-size: 12px;
+      color: var(--dim);
+    }
+
+    /* ── Result card ── */
+    .result {
+      margin-top: 14px;
+      border-radius: 10px;
+      padding: 18px;
+      display: none;
+    }
+
+    .result.threat {
+      background: var(--threat-bg);
+      border: 1px solid var(--threat);
+    }
+
+    .result.benign {
+      background: var(--ok-bg);
+      border: 1px solid var(--ok);
+    }
+
+    .result.error {
+      background: #140d00;
+      border: 1px solid var(--warn);
+    }
+
+    .result-heading {
+      font-size: 16px;
+      font-weight: 800;
+      margin-bottom: 10px;
+      font-family: 'Syne', sans-serif;
+    }
+
+    .result.threat .result-heading {
+      color: var(--threat);
+    }
+
+    .result.benign .result-heading {
+      color: var(--ok);
+    }
+
+    .result.error .result-heading {
+      color: var(--warn);
+    }
+
+    .result-badges {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+      align-items: center;
+    }
+
+    .badge {
+      background: rgba(255, 255, 255, .06);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 3px 12px;
+      font-size: 11px;
+      color: var(--dim);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .badge strong {
+      color: var(--text);
+    }
+
+    .conf-bar {
+      height: 5px;
+      border-radius: 3px;
+      overflow: hidden;
+      background: var(--surface2);
+      margin: 6px 0 12px;
+    }
+
+    .conf-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width .6s;
+    }
+
+    .conf-fill.high {
+      background: linear-gradient(90deg, var(--threat), #ff6b81);
+    }
+
+    .conf-fill.med {
+      background: linear-gradient(90deg, var(--warn), #fcd34d);
+    }
+
+    .conf-fill.low {
+      background: linear-gradient(90deg, var(--ok), #34d399);
+    }
+
+    /* ── Detail sections ── */
+    .detail-block {
+      background: rgba(255, 255, 255, .03);
+      border-left: 2px solid var(--accent);
+      border-radius: 0 6px 6px 0;
+      padding: 10px 14px;
+      margin-bottom: 10px;
+    }
+
+    .detail-block.threat-accent {
+      border-left-color: var(--threat);
+    }
+
+    .detail-block.ok-accent {
+      border-left-color: var(--ok);
+    }
+
+    .detail-label {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--accent);
+      font-weight: 700;
+      margin-bottom: 5px;
+    }
+
+    .detail-label.threat {
+      color: var(--threat);
+    }
+
+    .detail-label.ok {
+      color: var(--ok);
+    }
+
+    .detail-text {
+      font-size: 12.5px;
+      color: var(--dim);
+      line-height: 1.65;
+    }
+
+    /* ── Risk tags ── */
+    .risk-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 2px;
+    }
+
+    .risk-tag {
+      background: rgba(244, 63, 94, .12);
+      border: 1px solid rgba(244, 63, 94, .3);
+      color: #fb7185;
+      border-radius: 14px;
+      padding: 2px 10px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    /* ── Action box ── */
+    .action-box {
+      background: rgba(99, 102, 241, .1);
+      border: 1px solid rgba(99, 102, 241, .25);
+      border-radius: 7px;
+      padding: 10px 14px;
+      margin-bottom: 10px;
+      font-size: 12.5px;
+      color: #a5b4fc;
+      line-height: 1.6;
+    }
+
+    .action-box .action-label {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--accent);
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    /* ── Meta strip ── */
+    .meta-strip {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+    }
+
+    /* ── Raw toggle ── */
+    .raw-toggle {
+      font-size: 11px;
+      color: var(--accent);
+      cursor: pointer;
+      margin-top: 8px;
+      display: inline-block;
+    }
+
+    .raw-toggle:hover {
+      text-decoration: underline;
+    }
+
+    .raw-block {
+      display: none;
+      background: #04060a;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px;
+      font-size: 11px;
+      color: var(--dim);
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 200px;
+      overflow-y: auto;
+      margin-top: 6px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="header">
+    <div class="logo">🔍</div>
+    <div>
+      <div class="header-title">ThreatSense VLM Analyser</div>
+      <div class="header-subtitle">Ollama-powered intent threat detection</div>
+    </div>
+    <span class="model-tag" id="model-tag">{{ model }}</span>
+    <span class="health-dot" id="health-dot" title="Checking Ollama…"></span>
+  </div>
+
+  <div class="health-bar" id="health-bar">Checking Ollama connection…</div>
+
+  <div class="main">
+
+    <!-- ── Images panel ─────────────────────── -->
+    <div class="panel">
+      <div class="panel-header">📷 Analyse Images</div>
+      <div class="panel-body">
+        <p style="font-size:12.5px;color:var(--dim);margin-bottom:14px;">
+          Upload 1–6 JPEG/PNG image frames. All are sent together so the model sees full temporal context.
+        </p>
+        <div class="drop-zone" id="img-drop" onclick="document.getElementById('img-input').click()"
+          ondragover="ev(event,'over','img-drop')" ondragleave="ev(event,'leave','img-drop')" ondrop="imgDrop(event)">
+          <div class="drop-icon">📷</div>
+          <div class="drop-label">Drop images here or click to browse</div>
+          <div class="drop-sub">JPEG · PNG · up to 6 files</div>
+        </div>
+        <input type="file" id="img-input" multiple accept="image/*" style="display:none" onchange="imgPicked(this)">
+        <div class="file-list" id="img-list"></div>
+
+        <div class="field" style="margin-top:12px;">
+          <label>Context hint (optional)</label>
+          <input type="text" id="img-ctx" placeholder="e.g. person near bicycle detected by YOLO at 02:30">
+        </div>
+
+        <button class="btn btn-primary" id="img-btn" onclick="submitImages()" disabled>
+          <span id="img-btn-icon">🔍</span> Analyse
+        </button>
+
+        <div class="progress-wrap" id="img-progress">
+          <div class="progress-label" id="img-progress-msg">Sending to VLM…</div>
+          <div class="progress-bar">
+            <div class="progress-fill" id="img-progress-fill"></div>
+          </div>
+        </div>
+        <div class="result" id="img-result"></div>
+      </div>
+    </div>
+
+    <!-- ── Video panel ──────────────────────── -->
+    <div class="panel">
+      <div class="panel-header">🎬 Analyse Video</div>
+      <div class="panel-body">
+        <p style="font-size:12.5px;color:var(--dim);margin-bottom:14px;">
+          Upload any video. Frames are extracted with ffmpeg and the most representative keyframes are sent to the VLM.
+        </p>
+        <div class="drop-zone" id="vid-drop" onclick="document.getElementById('vid-input').click()"
+          ondragover="ev(event,'over','vid-drop')" ondragleave="ev(event,'leave','vid-drop')" ondrop="vidDrop(event)">
+          <div class="drop-icon">🎬</div>
+          <div class="drop-label">Drop video here or click to browse</div>
+          <div class="drop-sub">MP4 · MOV · AVI · MKV</div>
+          <div id="vid-name" style="margin-top:8px;font-size:13px;color:var(--accent);"></div>
+        </div>
+        <input type="file" id="vid-input" accept="video/*" style="display:none" onchange="vidPicked(this)">
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;">
+          <div class="field">
+            <label>Sample FPS</label>
+            <input type="number" id="vid-fps" value="2" min="1" max="10">
+            <div style="font-size:10px;color:var(--muted);margin-top:3px;">2 FPS is optimal</div>
+          </div>
+          <div class="field">
+            <label>Max keyframes → VLM</label>
+            <input type="number" id="vid-kf" value="5" min="1" max="6">
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Context hint (optional)</label>
+          <input type="text" id="vid-ctx" placeholder="e.g. night-time outdoor parking lot">
+        </div>
+
+        <button class="btn btn-primary" id="vid-btn" onclick="submitVideo()" disabled>
+          <span id="vid-btn-icon">🔍</span> Analyse
+        </button>
+
+        <div class="progress-wrap" id="vid-progress">
+          <div class="progress-label" id="vid-progress-msg">Uploading…</div>
+          <div class="progress-bar">
+            <div class="progress-fill" id="vid-progress-fill"></div>
+          </div>
+        </div>
+        <div class="result" id="vid-result"></div>
+      </div>
+    </div>
+
+  </div><!-- /.main -->
+
+  <script>
+    // ─── Health check ───────────────────────────────────────────────────────────
+    async function checkHealth() {
+      const dot = document.getElementById('health-dot');
+      const bar = document.getElementById('health-bar');
+      try {
+        const r = await fetch('/health');
+        const d = await r.json();
+        if (d.ok) {
+          dot.className = 'health-dot ok';
+          bar.innerHTML = `✓ Ollama connected · model <strong>${d.model}</strong> ready`;
+          bar.style.color = 'var(--ok)';
+        } else {
+          dot.className = 'health-dot err';
+          bar.textContent = '✗ ' + d.message;
+          bar.style.color = 'var(--threat)';
+        }
+      } catch {
+        dot.className = 'health-dot err';
+        bar.textContent = '✗ Cannot reach server — is api.py running?';
+        bar.style.color = 'var(--threat)';
+      }
+    }
+    checkHealth();
+    setInterval(checkHealth, 15000);
+
+    // ─── Drag helpers ────────────────────────────────────────────────────────────
+    function ev(e, action, id) {
+      e.preventDefault();
+      document.getElementById(id).classList.toggle('over', action === 'over');
+    }
+
+    // ─── Image panel ─────────────────────────────────────────────────────────────
+    let imgFiles = [];
+
+    function imgPicked(input) { addImgFiles([...input.files]); }
+    function imgDrop(e) {
+      e.preventDefault();
+      document.getElementById('img-drop').classList.remove('over');
+      addImgFiles([...e.dataTransfer.files].filter(f => f.type.startsWith('image/')));
+    }
+    function addImgFiles(files) {
+      imgFiles = [...imgFiles, ...files.slice(0, 6 - imgFiles.length)];
+      renderImgList();
+    }
+    function removeImg(i) { imgFiles.splice(i, 1); renderImgList(); }
+    function renderImgList() {
+      document.getElementById('img-list').innerHTML = imgFiles.map((f, i) => {
+        const url = URL.createObjectURL(f);
+        return `<div class="file-chip">
+      <img src="${url}">
+      <span style="font-size:11px;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${f.name}</span>
+      <span class="remove" onclick="removeImg(${i})">✕</span>
+    </div>`;
+      }).join('');
+      document.getElementById('img-btn').disabled = imgFiles.length === 0;
+    }
+
+    async function submitImages() {
+      const fd = new FormData();
+      imgFiles.forEach(f => fd.append('images', f));
+      fd.append('context', document.getElementById('img-ctx').value);
+      setAnalysing('img', true, 'Sending images to VLM…', 30);
+      try {
+        const r = await fetch('/analyse/images', { method: 'POST', body: fd });
+        const d = await r.json();
+        r.ok ? showResult('img', d) : showError('img', d.detail || JSON.stringify(d));
+      } catch (e) { showError('img', String(e)); }
+      setAnalysing('img', false);
+    }
+
+    // ─── Video panel ─────────────────────────────────────────────────────────────
+    let vidFile = null;
+
+    function vidPicked(input) { if (input.files[0]) setVidFile(input.files[0]); }
+    function vidDrop(e) {
+      e.preventDefault();
+      document.getElementById('vid-drop').classList.remove('over');
+      const f = e.dataTransfer.files[0];
+      if (f && f.type.startsWith('video/')) setVidFile(f);
+    }
+    function setVidFile(f) {
+      vidFile = f;
+      document.getElementById('vid-name').textContent = `${f.name}  (${(f.size / 1024 / 1024).toFixed(1)} MB)`;
+      document.getElementById('vid-btn').disabled = false;
+    }
+
+    const VID_STEPS = [
+      'Uploading video…',
+      'Extracting frames with ffmpeg…',
+      'Selecting keyframes…',
+      'Sending to VLM · deep intent analysis (may take 30–90s)…',
+      'Parsing verdict…',
+    ];
+    async function submitVideo() {
+      if (!vidFile) return;
+      const fd = new FormData();
+      fd.append('file', vidFile);
+      fd.append('fps', document.getElementById('vid-fps').value);
+      fd.append('max_keyframes', document.getElementById('vid-kf').value);
+      fd.append('context', document.getElementById('vid-ctx').value);
+
+      setAnalysing('vid', true, VID_STEPS[0], 8);
+      let step = 0;
+      const ticker = setInterval(() => {
+        step = Math.min(step + 1, VID_STEPS.length - 1);
+        document.getElementById('vid-progress-msg').textContent = VID_STEPS[step];
+        document.getElementById('vid-progress-fill').style.width = (10 + step * 18) + '%';
+      }, 5000);
+
+      try {
+        const r = await fetch('/analyse/video', { method: 'POST', body: fd });
+        clearInterval(ticker);
+        document.getElementById('vid-progress-fill').style.width = '100%';
+        const d = await r.json();
+        r.ok ? showResult('vid', d) : showError('vid', d.detail || JSON.stringify(d));
+      } catch (e) {
+        clearInterval(ticker);
+        showError('vid', String(e));
+      }
+      setAnalysing('vid', false);
+    }
+
+    // ─── UI helpers ──────────────────────────────────────────────────────────────
+    function setAnalysing(p, on, msg = '', pct = 0) {
+      document.getElementById(p + '-btn').disabled = on;
+      document.getElementById(p + '-btn-icon').innerHTML = on ? '<div class="spinner"></div>' : '🔍';
+      document.getElementById(p + '-progress').style.display = on ? 'block' : 'none';
+      if (on) {
+        document.getElementById(p + '-progress-msg').textContent = msg;
+        document.getElementById(p + '-progress-fill').style.width = pct + '%';
+      }
+    }
+
+    function showResult(p, d) {
+      const el = document.getElementById(p + '-result');
+      const isT = d.verdict === 'THREAT';
+      const conf = Math.round((d.confidence || 0) * 100);
+      const confCls = conf >= 75 ? 'high' : conf >= 45 ? 'med' : 'low';
+      const typeLabel = d.type && d.type !== 'none' ? d.type.replace(/_/g, ' ').toUpperCase() : '—';
+      const meta = d.total_frames
+        ? `Sampled from video · ${d.total_frames} total frames · ${d.keyframes_to_vlm} keyframe(s) sent to VLM`
+        : '';
+
+      // Risk factor tags
+      const riskTags = Array.isArray(d.risk_factors) && d.risk_factors.length
+        ? `<div class="risk-tags">${d.risk_factors.map(r => `<span class="risk-tag">⚡ ${r}</span>`).join('')}</div>`
+        : '<span style="color:var(--muted);font-size:11px;">None identified</span>';
+
+      el.className = `result ${isT ? 'threat' : 'benign'}`;
+      el.innerHTML = `
+    <div class="result-heading">${isT ? '⚠ THREAT DETECTED' : '✓ No Threat — All Clear'}</div>
+
+    <div class="result-badges">
+      <div class="badge">Type <strong>${typeLabel}</strong></div>
+      <div class="badge">Confidence <strong>${conf}%</strong></div>
+    </div>
+    <div class="conf-bar"><div class="conf-fill ${confCls}" style="width:${conf}%"></div></div>
+
+    <!-- Headline reason -->
+    <div class="detail-block ${isT ? 'threat-accent' : 'ok-accent'}">
+      <div class="detail-label ${isT ? 'threat' : 'ok'}">🔍 Headline Finding</div>
+      <div class="detail-text" style="font-weight:600;font-size:13px;color:var(--text);">${d.reason || '—'}</div>
+    </div>
+
+    ${d.scene_description ? `
+    <div class="detail-block">
+      <div class="detail-label">🏙️ Scene Description</div>
+      <div class="detail-text">${d.scene_description}</div>
+    </div>` : ''}
+
+    ${d.behaviour_analysis ? `
+    <div class="detail-block">
+      <div class="detail-label">🧍 Behaviour Analysis</div>
+      <div class="detail-text">${d.behaviour_analysis}</div>
+    </div>` : ''}
+
+    ${d.risk_factors !== undefined ? `
+    <div class="detail-block threat-accent">
+      <div class="detail-label threat">⚠️ Risk Factors Identified</div>
+      ${riskTags}
+    </div>` : ''}
+
+    ${d.recommended_action ? `
+    <div class="action-box">
+      <div class="action-label">🛡️ Recommended Action</div>
+      ${d.recommended_action}
+    </div>` : ''}
+
+    ${meta ? `<div class="meta-strip">${meta}</div>` : ''}
+    <span class="raw-toggle" onclick="toggleRaw(this)">Show raw JSON ▾</span>
+    <pre class="raw-block">${JSON.stringify(d, null, 2)}</pre>
+  `;
+      el.style.display = 'block';
+    }
+
+    function showError(p, msg) {
+      const el = document.getElementById(p + '-result');
+      el.className = 'result error';
+      el.innerHTML = `<div class="result-heading">⚠ Error</div>
+    <div style="font-size:13px;color:#fbbf24;margin-top:6px;line-height:1.6;">${msg}</div>`;
+      el.style.display = 'block';
+    }
+
+    function toggleRaw(btn) {
+      const raw = btn.nextElementSibling;
+      const open = raw.style.display === 'block';
+      raw.style.display = open ? 'none' : 'block';
+      btn.textContent = open ? 'Show raw JSON ▾' : 'Hide raw JSON ▴';
+    }
+  </script>
+</body>
+
+</html>
