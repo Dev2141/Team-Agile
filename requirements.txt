@@ -1,0 +1,20 @@
+# AI-Powered DVR - Stage 1 Dependencies
+
+# YOLO Model (auto-downloads weights on first run)
+ultralytics>=8.0.0
+
+# OpenCV for video processing and RTSP streaming
+opencv-python>=4.8.0
+
+# Additional dependencies for YOLO
+numpy>=1.24.0
+torch>=2.0.0
+torchvision>=0.15.0
+
+# For IP Webcam connection testing
+requests>=2.31.0
+
+# Optional: For GPU acceleration (uncomment if you have NVIDIA GPU)
+# Install CUDA toolkit first, then:
+# torch>=2.0.0+cu118 --index-url https://download.pytorch.org/whl/cu118
+# torchvision>=0.15.0+cu118 --index-url https://download.pytorch.org/whl/cu118
